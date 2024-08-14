@@ -1,5 +1,12 @@
-const qrcode = require('qrcode-terminal');
+const express = require('express');
+const http = require('http');
+const socketIo = require('socket.io');
 const { Client, LocalAuth } = require('whatsapp-web.js');
+const qr = require('qrcode');
+
+const app = express();
+const server = http.createServer(app);
+const io = socketIo(server);
 
 const client = new Client({
     authStrategy: new LocalAuth(),
@@ -8,13 +15,25 @@ const client = new Client({
     }
 });
 
-client.on('qr', (qr) => {
-    qrcode.generate(qr, { small: true });
-    console.log('Escanea el código QR con tu aplicación de WhatsApp.');
+app.get('/', (req, res) => {
+    res.sendFile(__dirname + '/index.html');
+});
+
+io.on('connection', (socket) => {
+    console.log('Un cliente se ha conectado');
+});
+
+client.on('qr', (qrCode) => {
+    console.log('Nuevo código QR recibido');
+    qr.toDataURL(qrCode, (err, url) => {
+        io.emit('qr', url);
+        console.log('Código QR enviado al cliente');
+    });
 });
 
 client.on('ready', () => {
-    console.log('Cliente está listo!');
+    console.log('Cliente de WhatsApp está listo!');
+    io.emit('ready', 'WhatsApp está conectado!');
 });
 
 const areas = {
@@ -88,7 +107,7 @@ Por favor, elige el área con la que deseas comunicarte:
             conversation.nombre = msg.body;
             const redirectNumber = areas[conversation.selectedArea];
             const areaName = conversation.selectedArea.charAt(0).toUpperCase() + conversation.selectedArea.slice(1);
-            const link = `https://wa.me/${redirectNumber.replace('+', '')}?text=Hola+soy+${conversation.nombre}.+Me+comunico+con+el+área+de+${areaName}.`;
+            const link = `https://wa.me/${redirectNumber.replace('+', '')}?text=Hola,+soy+${conversation.nombre}.+Me+ comunico+con+el+área+de+${areaName}.`;
             await sendMessage(from, `Gracias, ${conversation.nombre}. Te estamos redirigiendo al área de ${conversation.selectedArea}. Por favor, haz clic en este enlace: ${link}`);
             conversation.step = 'inicio';
             break;
@@ -109,3 +128,8 @@ client.on('message', async (msg) => {
 });
 
 client.initialize();
+
+const port = 3000;
+server.listen(port, () => {
+    console.log(`Servidor corriendo en http://localhost:${port}`);
+});
