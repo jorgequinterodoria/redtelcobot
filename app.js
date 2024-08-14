@@ -26,6 +26,10 @@ io.on('connection', (socket) => {
 client.on('qr', (qrCode) => {
     console.log('Nuevo código QR recibido');
     qr.toDataURL(qrCode, (err, url) => {
+        if (err) {
+            console.error('Error al generar el código QR:', err);
+            return;
+        }
         io.emit('qr', url);
         console.log('Código QR enviado al cliente');
     });
